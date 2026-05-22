@@ -1,328 +1,49 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BTECH Orientation Convert</title>
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BTECH Orientation Full 3D</title>
 <style>
-*{box-sizing:border-box}
-body{
-  font-family:Arial,sans-serif;
-  background:#0f172a;
-  margin:0;
-  padding:24px;
-  color:white;
-}
-.container{
-  max-width:1200px;
-  margin:auto;
-}
-.card{
-  background:#111827;
-  border-radius:18px;
-  padding:22px;
-  margin-bottom:20px;
-  border:1px solid #1e293b;
-}
-h1{margin-top:0;margin-bottom:8px}
-h2{margin-top:0}
-p{color:#cbd5e1}
-img{
-  width:100%;
-  border-radius:16px;
-  display:block;
-  border:1px solid #1e293b;
-}
-.input-grid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:18px;
-  align-items:end;
-}
-.field label{
-  display:block;
-  margin-bottom:8px;
-  font-weight:700;
-  color:#e5e7eb;
-}
-input{
-  width:100%;
-  padding:13px 14px;
-  border-radius:10px;
-  border:1px solid #334155;
-  font-size:16px;
-  background:#ffffff;
-  color:#111827;
-}
-.button-row{
-  display:grid;
-  grid-template-columns:2fr 1fr 1fr;
-  gap:12px;
-  margin-top:18px;
-}
-button{
-  width:100%;
-  padding:14px;
-  border:none;
-  border-radius:12px;
-  background:#2563eb;
-  color:white;
-  font-size:16px;
-  font-weight:bold;
-  cursor:pointer;
-}
-button.secondary{background:#334155}
-button.export{background:#047857}
-button.clear{background:#7f1d1d}
-.result{
-  margin-top:18px;
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:12px;
-}
-.box{
-  background:#1e293b;
-  padding:14px;
-  border-radius:12px;
-}
-.box small{
-  color:#94a3b8;
-  display:block;
-  margin-bottom:6px;
-}
-.box strong{
-  font-size:24px;
-}
-.note{
-  margin-top:14px;
-  background:#052e16;
-  border:1px solid #16a34a;
-  color:#bbf7d0;
-  padding:12px;
-  border-radius:12px;
-  display:none;
-}
-.table-wrap{
-  overflow-x:auto;
-}
-table{
-  width:100%;
-  border-collapse:collapse;
-  min-width:780px;
-}
-th,td{
-  border-bottom:1px solid #334155;
-  padding:10px;
-  text-align:right;
-}
-th:first-child,td:first-child{text-align:left}
-th{
-  color:#cbd5e1;
-  background:#0f172a;
-}
-@media(max-width:800px){
-  body{padding:12px}
-  .input-grid,.result,.button-row{
-    grid-template-columns:1fr;
-  }
-}
-</style>
-</head>
-<body>
-<div class="container">
-
-<div class="card">
-<h1>BTECH Alpha-Beta Orientation Calculator</h1>
-<p>Convert Alpha / Beta to True Dip and Dip Direction</p>
-</div>
-
-<div class="card">
-<h2>Graphic Guide</h2>
-<img src="graphic_guide_orientation.png" alt="orientation guide">
-</div>
-
-<div class="card">
-<h2>Calculator</h2>
-
-<div class="input-grid">
-  <div class="field">
-    <label>Alpha α (°)</label>
-    <input id="alpha" type="number" value="50" step="0.01">
-  </div>
-  <div class="field">
-    <label>Beta β raw (°)</label>
-    <input id="beta" type="number" value="60" step="0.01">
-  </div>
-  <div class="field">
-    <label>OM Azimuth (°)</label>
-    <input id="azom" type="number" value="120" step="0.01">
-  </div>
-</div>
-
-<div class="button-row">
-  <button onclick="calc()">Calculate</button>
-  <button class="secondary" onclick="addRecord()">Add to Table</button>
-  <button class="export" onclick="exportCSV()">Export CSV</button>
-</div>
-
-<div id="specialNote" class="note"></div>
-
-<div class="result">
-  <div class="box"><small>β use</small><strong id="betaUse">-</strong></div>
-  <div class="box"><small>True Dip</small><strong id="dip">-</strong></div>
-  <div class="box"><small>Dip Direction</small><strong id="dipdir">-</strong></div>
-  <div class="box"><small>Strike</small><strong id="strike">-</strong></div>
-</div>
-</div>
-
-<div class="card">
-<h2>Records</h2>
-<div class="button-row" style="grid-template-columns:1fr 1fr 1fr;">
-  <button class="secondary" onclick="addRecord()">Add Current Result</button>
-  <button class="export" onclick="exportCSV()">Export CSV</button>
-  <button class="clear" onclick="clearRecords()">Clear Table</button>
-</div>
-
-<div class="table-wrap">
-<table>
-<thead>
-<tr>
-<th>#</th>
-<th>Alpha</th>
-<th>Beta raw</th>
-<th>Beta use</th>
-<th>OM Azimuth</th>
-<th>True Dip</th>
-<th>Dip Direction</th>
-<th>Strike</th>
-</tr>
-</thead>
-<tbody id="tbody"></tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-<script>
-let records=[];
-let last=null;
-
-function rad(d){return d*Math.PI/180;}
-function deg(r){return r*180/Math.PI;}
-function norm360(x){
-  x=x%360;
-  if(x<0)x+=360;
-  return x;
-}
-function round2(x){return Math.round(x*100)/100;}
-
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;background:#0f172a;margin:0;padding:24px;color:white}.container{max-width:1200px;margin:auto}.card{background:#111827;border-radius:18px;padding:22px;margin-bottom:20px;border:1px solid #1e293b}h1{margin:0 0 8px}h2{margin-top:0}p{color:#cbd5e1;line-height:1.5}img{width:100%;border-radius:16px;border:1px solid #1e293b}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:18px}.field label{display:block;margin-bottom:8px;font-weight:700}.field small{display:block;color:#94a3b8;margin-top:5px;font-size:12px}input{width:100%;padding:13px;border-radius:10px;border:1px solid #334155;font-size:16px}.btns{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-top:18px}button{padding:14px;border:0;border-radius:12px;background:#2563eb;color:white;font-size:16px;font-weight:bold;cursor:pointer}.secondary{background:#334155}.export{background:#047857}.clear{background:#7f1d1d}.result{margin-top:18px;display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.box{background:#1e293b;padding:14px;border-radius:12px}.box small{color:#94a3b8;display:block;margin-bottom:6px}.box strong{font-size:22px}.warn{margin-top:14px;background:#451a03;border:1px solid #f59e0b;color:#fde68a;padding:12px;border-radius:12px}.note{margin-top:14px;background:#052e16;border:1px solid #16a34a;color:#bbf7d0;padding:12px;border-radius:12px;display:none}.formula{background:#0f172a;border:1px solid #334155;padding:14px;border-radius:12px;color:#cbd5e1;font-family:Consolas,monospace;font-size:13px;line-height:1.55;overflow:auto}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:980px}th,td{border-bottom:1px solid #334155;padding:10px;text-align:right}th:first-child,td:first-child{text-align:left}th{color:#cbd5e1;background:#0f172a}@media(max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}.result{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){body{padding:12px}.grid,.result,.btns{grid-template-columns:1fr}}
+</style></head><body><div class="container">
+<div class="card"><h1>BTECH Alpha-Beta Orientation Calculator — Full 3D</h1><p>Convert Alpha / Beta to True Dip and Dip Direction with borehole inclination correction.</p><div class="warn"><b>Full 3D mode:</b> ใช้กับหลุมเอียงได้ โดยต้องกรอก Hole Azimuth และ Hole Inclination เพิ่มด้วย</div></div>
+<div class="card"><h2>Graphic Guide</h2><img src="graphic_guide_orientation.png" alt="orientation guide"></div>
+<div class="card"><h2>Calculator Input</h2><div class="grid">
+<div class="field"><label>Alpha α (°)</label><input id="alpha" type="number" value="55" step="0.01"><small>Apparent dip angle</small></div>
+<div class="field"><label>Beta β raw (°)</label><input id="beta" type="number" value="90" step="0.01"><small>Clockwise from OM line</small></div>
+<div class="field"><label>OM Azimuth (°)</label><input id="azom" type="number" value="75" step="0.01"><small>Azimuth of OM / reference line</small></div>
+<div class="field"><label>Hole Azimuth (°)</label><input id="holeAz" type="number" value="75" step="0.01"><small>Downhole direction azimuth</small></div>
+<div class="field"><label>Hole Inclination (°)</label><input id="holeInc" type="number" value="60" step="0.01"><small>0° horizontal, 90° vertical</small></div>
+</div><div class="btns"><button onclick="calc()">Calculate</button><button class="secondary" onclick="addRecord()">Add to Table</button><button class="export" onclick="exportCSV()">Export CSV</button></div>
+<div id="specialNote" class="note"></div><div class="result">
+<div class="box"><small>β use</small><strong id="betaUse">-</strong></div><div class="box"><small>True Dip</small><strong id="dip">-</strong></div><div class="box"><small>Dip Direction</small><strong id="dipdir">-</strong></div><div class="box"><small>Strike RHR</small><strong id="strike">-</strong></div><div class="box"><small>Strike Alt.</small><strong id="strikeAlt">-</strong></div><div class="box"><small>Mode</small><strong>3D</strong></div>
+</div></div>
+<div class="card"><h2>Calculation Note</h2><div class="formula">Coordinate convention: NED system, azimuth clockwise from North, inclination = 0° horizontal and 90° vertical downward.<br>Process: alpha/beta → local plane normal → rotate using hole axis + OM reference → world normal → true dip/dip direction.</div></div>
+<div class="card"><h2>Records</h2><div class="btns" style="grid-template-columns:1fr 1fr 1fr"><button class="secondary" onclick="addRecord()">Add Current Result</button><button class="export" onclick="exportCSV()">Export CSV</button><button class="clear" onclick="clearRecords()">Clear Table</button></div><div class="table-wrap"><table><thead><tr><th>#</th><th>Alpha</th><th>Beta raw</th><th>Beta use</th><th>OM Az</th><th>Hole Az</th><th>Hole Inc</th><th>True Dip</th><th>Dip Direction</th><th>Strike RHR</th><th>Strike Alt</th></tr></thead><tbody id="tbody"></tbody></table></div></div>
+</div><script>
+let records=[],last=null;
+function rad(d){return d*Math.PI/180}function deg(r){return r*180/Math.PI}function norm360(x){x=x%360;if(x<0)x+=360;return x}function round2(x){return Math.round(x*100)/100}
+function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]}function cross(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]}
+function vnorm(v){const m=Math.sqrt(dot(v,v));return m<1e-12?null:[v[0]/m,v[1]/m,v[2]/m]}function add(a,b){return[a[0]+b[0],a[1]+b[1],a[2]+b[2]]}function mul(v,s){return[v[0]*s,v[1]*s,v[2]*s]}
+function localNormal(alpha,betaUse){let dip,dir;if(Math.abs(betaUse)<1e-10||Math.abs(betaUse-180)<1e-10){dip=90;dir=0}else{dip=Math.abs(deg(Math.atan(Math.tan(rad(alpha))/Math.sin(rad(betaUse)))));dir=deg(Math.atan(Math.cos(rad(betaUse))/Math.tan(rad(alpha))))}return{n:[-Math.sin(rad(dip))*Math.cos(rad(dir)),-Math.sin(rad(dip))*Math.sin(rad(dir)),Math.cos(rad(dip))],localDip:dip,localDir:dir}}
 function calc(){
-  const alpha=parseFloat(document.getElementById('alpha').value);
-  const betaRawInput=parseFloat(document.getElementById('beta').value);
-  const azomInput=parseFloat(document.getElementById('azom').value);
-  const note=document.getElementById('specialNote');
-  note.style.display='none';
-  note.innerHTML='';
-
-  if(isNaN(alpha)||isNaN(betaRawInput)||isNaN(azomInput)){
-    alert('กรุณากรอกตัวเลขให้ครบ');
-    return null;
-  }
-
-  const betaRaw=norm360(betaRawInput);
-  const betaUse=Math.min(betaRaw,360-betaRaw);
-  const azom=norm360(azomInput);
-
-  let trueDip,dipDir,strike;
-
-  if(Math.abs(betaUse)<1e-10 || Math.abs(betaUse-180)<1e-10){
-    trueDip=90;
-    dipDir=azom;
-    note.style.display='block';
-    note.innerHTML='Special case: β = 0° หรือ 180° → True Dip = 90° และ Dip Direction = OM Azimuth';
-  }else{
-    if(Math.abs(Math.tan(rad(alpha)))<1e-10){
-      alert('Alpha ใกล้ 0° สูตร Dip Direction จะไม่เสถียร');
-      return null;
-    }
-    trueDip=Math.abs(deg(Math.atan(Math.tan(rad(alpha))/Math.sin(rad(betaUse)))));
-    const offset=deg(Math.atan(Math.cos(rad(betaUse))/Math.tan(rad(alpha))));
-    dipDir=norm360(azom+offset);
-  }
-
-  strike=norm360(dipDir-90);
-
-  last={
-    alpha:round2(alpha),
-    betaRaw:round2(betaRawInput),
-    betaUse:round2(betaUse),
-    azom:round2(azom),
-    trueDip:round2(trueDip),
-    dipDir:round2(dipDir),
-    strike:round2(strike)
-  };
-
-  document.getElementById('betaUse').innerHTML=last.betaUse.toFixed(2)+'°';
-  document.getElementById('dip').innerHTML=last.trueDip.toFixed(2)+'°';
-  document.getElementById('dipdir').innerHTML=last.dipDir.toFixed(2)+'°';
-  document.getElementById('strike').innerHTML=last.strike.toFixed(2)+'°';
-
-  return last;
+ const alpha=parseFloat(alphaEl.value), betaIn=parseFloat(betaEl.value), azomIn=parseFloat(azomEl.value), holeAzIn=parseFloat(holeAzEl.value), holeInc=parseFloat(holeIncEl.value), note=document.getElementById('specialNote'); note.style.display='none'; note.innerHTML='';
+ if([alpha,betaIn,azomIn,holeAzIn,holeInc].some(isNaN)){alert('กรุณากรอกตัวเลขให้ครบ');return null}
+ if(holeInc<0||holeInc>90){alert('Hole Inclination ต้องอยู่ระหว่าง 0° ถึง 90°');return null}
+ const betaRaw=norm360(betaIn), betaUse=Math.min(betaRaw,360-betaRaw), azom=norm360(azomIn), holeAz=norm360(holeAzIn);
+ const loc=localNormal(alpha,betaUse);
+ const b=vnorm([Math.cos(rad(holeInc))*Math.cos(rad(holeAz)),Math.cos(rad(holeInc))*Math.sin(rad(holeAz)),Math.sin(rad(holeInc))]);
+ const h=[Math.cos(rad(azom)),Math.sin(rad(azom)),0];
+ let xAxis=vnorm(add(h,mul(b,-dot(h,b)))); if(!xAxis){alert('OM Azimuth ขนานกับ hole axis มากเกินไป');return null}
+ let yAxis=vnorm(cross(b,xAxis));
+ let nw=vnorm(add(add(mul(xAxis,loc.n[0]),mul(yAxis,loc.n[1])),mul(b,loc.n[2])));
+ if(nw[2]<0) nw=mul(nw,-1);
+ const horiz=Math.sqrt(nw[0]*nw[0]+nw[1]*nw[1]);
+ const trueDip=deg(Math.atan2(horiz,Math.abs(nw[2])));
+ let dipDir=0;if(horiz<1e-10){note.style.display='block';note.innerHTML='Plane ใกล้ horizontal มาก Dip Direction อาจไม่มีความหมายชัดเจน'}else{dipDir=norm360(deg(Math.atan2(-nw[1],-nw[0])))}
+ const strike=norm360(dipDir-90), strikeAlt=norm360(strike+180);
+ if(Math.abs(betaUse)<1e-10||Math.abs(betaUse-180)<1e-10){note.style.display='block';note.innerHTML='Special case: β = 0° หรือ 180° ใช้ local plane vertical ก่อนหมุนแก้ inclination'}
+ last={alpha:round2(alpha),betaRaw:round2(betaIn),betaUse:round2(betaUse),azom:round2(azom),holeAz:round2(holeAz),holeInc:round2(holeInc),trueDip:round2(trueDip),dipDir:round2(dipDir),strike:round2(strike),strikeAlt:round2(strikeAlt)};
+ betaUseEl.innerHTML=last.betaUse.toFixed(2)+'°';dipEl.innerHTML=last.trueDip.toFixed(2)+'°';dipdirEl.innerHTML=last.dipDir.toFixed(2)+'°';strikeEl.innerHTML=last.strike.toFixed(2)+'°';strikeAltEl.innerHTML=last.strikeAlt.toFixed(2)+'°';return last
 }
-
-function addRecord(){
-  const r=calc();
-  if(!r)return;
-  records.push({...r});
-  renderTable();
-}
-
-function renderTable(){
-  const tbody=document.getElementById('tbody');
-  tbody.innerHTML='';
-  records.forEach((r,i)=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`
-      <td>${i+1}</td>
-      <td>${r.alpha.toFixed(2)}</td>
-      <td>${r.betaRaw.toFixed(2)}</td>
-      <td>${r.betaUse.toFixed(2)}</td>
-      <td>${r.azom.toFixed(2)}</td>
-      <td>${r.trueDip.toFixed(2)}</td>
-      <td>${r.dipDir.toFixed(2)}</td>
-      <td>${r.strike.toFixed(2)}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-function exportCSV(){
-  if(records.length===0){
-    alert('ยังไม่มีข้อมูลในตาราง');
-    return;
-  }
-  const header=['No','Alpha','Beta_raw','Beta_use','OM_Azimuth','True_Dip','Dip_Direction','Strike'];
-  const rows=records.map((r,i)=>[
-    i+1,r.alpha,r.betaRaw,r.betaUse,r.azom,r.trueDip,r.dipDir,r.strike
-  ]);
-  const csv=[header,...rows].map(row=>row.join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download='btech_orientation_records.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function clearRecords(){
-  records=[];
-  renderTable();
-}
-
-calc();
-</script>
-
-</body>
-</html>
+const alphaEl=document.getElementById('alpha'), betaEl=document.getElementById('beta'), azomEl=document.getElementById('azom'), holeAzEl=document.getElementById('holeAz'), holeIncEl=document.getElementById('holeInc'), betaUseEl=document.getElementById('betaUse'), dipEl=document.getElementById('dip'), dipdirEl=document.getElementById('dipdir'), strikeEl=document.getElementById('strike'), strikeAltEl=document.getElementById('strikeAlt');
+function addRecord(){const r=calc();if(!r)return;records.push({...r});renderTable()}function renderTable(){const tbody=document.getElementById('tbody');tbody.innerHTML='';records.forEach((r,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${i+1}</td><td>${r.alpha.toFixed(2)}</td><td>${r.betaRaw.toFixed(2)}</td><td>${r.betaUse.toFixed(2)}</td><td>${r.azom.toFixed(2)}</td><td>${r.holeAz.toFixed(2)}</td><td>${r.holeInc.toFixed(2)}</td><td>${r.trueDip.toFixed(2)}</td><td>${r.dipDir.toFixed(2)}</td><td>${r.strike.toFixed(2)}</td><td>${r.strikeAlt.toFixed(2)}</td>`;tbody.appendChild(tr)})}
+function exportCSV(){if(records.length===0){alert('ยังไม่มีข้อมูลในตาราง');return}const header=['No','Alpha','Beta_raw','Beta_use','OM_Azimuth','Hole_Azimuth','Hole_Inclination','True_Dip','Dip_Direction','Strike_RHR','Strike_Alt'];const rows=records.map((r,i)=>[i+1,r.alpha,r.betaRaw,r.betaUse,r.azom,r.holeAz,r.holeInc,r.trueDip,r.dipDir,r.strike,r.strikeAlt]);const csv=[header,...rows].map(r=>r.join(',')).join('\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='btech_orientation_full3d_records.csv';a.click();URL.revokeObjectURL(url)}
+function clearRecords(){records=[];renderTable()}calc();
+</script></body></html>
