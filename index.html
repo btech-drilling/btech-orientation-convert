@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BTECH Orientation Full 3D</title>
+<title>BTECH Orientation Full 3D - Corrected Beta Logic</title>
 <style>
 *{box-sizing:border-box}
 body{font-family:Arial,sans-serif;background:#0f172a;margin:0;padding:24px;color:white}
@@ -43,9 +43,9 @@ th{color:#cbd5e1;background:#0f172a}
 <div class="container">
 
 <div class="card">
-<h1>BTECH Alpha-Beta Orientation Calculator — Full 3D</h1>
+<h1>BTECH Alpha-Beta Orientation Calculator — Full 3D v2</h1>
 <p>Full 3D correction for inclined boreholes, with Plane A / Plane B ambiguity shown.</p>
-<div class="warn"><b>Update:</b> β = 0° / 180° ไม่ล็อก True Dip = 90° แล้ว — Alpha จะมีผลในการคำนวณ</div>
+<div class="warn"><b>Update:</b> สูตรนี้แก้ใหม่ให้ใช้ β raw เต็มช่วง 0–360° และคำนวณ Plane B จาก β + 180° โดยตรง ไม่ใช้การกลับ Dip Direction แบบเดิม</div>
 </div>
 
 <div class="card">
@@ -103,8 +103,8 @@ th{color:#cbd5e1;background:#0f172a}
 <div class="card">
 <h2>Calculation Note</h2>
 <div class="formula">
-Plane A/B: same plane, dip direction differs by 180°.<br>
-β = 0° / 180° handling: use local dip = α along OM reference direction, then rotate into world coordinates using hole azimuth/inclination.<br>
+Plane A/B: alternative alpha-beta solutions from core orientation ambiguity. Plane B is recalculated from β + 180°, not created by simply adding 180° to Dip Direction.<br>
+β raw is preserved in the full 0–360° range so β = 90° and β = 270° are treated as different sides of the OM reference.<br>
 Coordinate convention: NED, azimuth clockwise from North, inclination = 0° horizontal and 90° vertical downward.
 </div>
 </div>
@@ -134,16 +134,51 @@ function cross(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1
 function vnorm(v){const m=Math.sqrt(dot(v,v));return m<1e-12?null:[v[0]/m,v[1]/m,v[2]/m]}
 function add(a,b){return[a[0]+b[0],a[1]+b[1],a[2]+b[2]]}function mul(v,s){return[v[0]*s,v[1]*s,v[2]*s]}
 
-function localNormal(alpha,betaUse){
- let dip,dir;
- if(Math.abs(betaUse)<1e-10 || Math.abs(betaUse-180)<1e-10){
-   dip = alpha;
+function localNormal(alpha,betaRaw){
+ /*
+  Corrected alpha-beta local solution:
+  - Use betaRaw in full 0–360° range. Do NOT fold beta to 0–180°.
+  - Preserve quadrant so beta 90° and 270° are not treated as the same side.
+  - alpha is treated as the apparent dip measured on the oriented core.
+ */
+ const beta = norm360(betaRaw);
+ const eps = 1e-10;
+ const alphaClamped = Math.max(0, Math.min(89.999999, alpha));
+ const tanA = Math.tan(rad(alphaClamped));
+ const sinB = Math.sin(rad(beta));
+ const cosB = Math.cos(rad(beta));
+
+ let dip, dir;
+
+ if(alphaClamped < eps){
+   dip = 0;
    dir = 0;
+ } else if(Math.abs(sinB) < eps){
+   // Near beta = 0° or 180°: avoid singular apparent-dip division.
+   // Keep alpha active and use OM / opposite-OM side as the local dip direction.
+   dip = alphaClamped;
+   dir = beta < 90 || beta > 270 ? 0 : 180;
  } else {
-   dip = Math.abs(deg(Math.atan(Math.tan(rad(alpha))/Math.sin(rad(betaUse)))));
-   dir = deg(Math.atan(Math.cos(rad(betaUse))/Math.tan(rad(alpha))));
+   // Apparent dip to local true dip.
+   dip = Math.abs(deg(Math.atan(tanA / sinB)));
+
+   // Preserve the beta quadrant. atan2 avoids the old loss of direction.
+   dir = norm360(deg(Math.atan2(cosB, tanA)));
+   if(sinB < 0){
+     dir = norm360(dir + 180);
+   }
  }
- return{n:[-Math.sin(rad(dip))*Math.cos(rad(dir)),-Math.sin(rad(dip))*Math.sin(rad(dir)),Math.cos(rad(dip))],localDip:dip,localDir:dir}
+
+ return{
+   n:[
+     -Math.sin(rad(dip))*Math.cos(rad(dir)),
+     -Math.sin(rad(dip))*Math.sin(rad(dir)),
+      Math.cos(rad(dip))
+   ],
+   localDip:dip,
+   localDir:dir,
+   betaUse:beta
+ }
 }
 function orientationFromNormal(nw){
  if(nw[2]<0) nw=mul(nw,-1);
@@ -158,20 +193,46 @@ function calc(){
  const alpha=parseFloat(alphaEl.value), betaIn=parseFloat(betaEl.value), azomIn=parseFloat(azomEl.value), holeAzIn=parseFloat(holeAzEl.value), holeInc=parseFloat(holeIncEl.value);
  const note=document.getElementById('specialNote');note.style.display='none';note.innerHTML='';
  if([alpha,betaIn,azomIn,holeAzIn,holeInc].some(isNaN)){alert('กรุณากรอกตัวเลขให้ครบ');return null}
+ if(alpha<0||alpha>=90){alert('Alpha ต้องอยู่ระหว่าง 0° ถึงน้อยกว่า 90°');return null}
  if(holeInc<0||holeInc>90){alert('Hole Inclination ต้องอยู่ระหว่าง 0° ถึง 90°');return null}
- const betaRaw=norm360(betaIn), betaUse=Math.min(betaRaw,360-betaRaw), azom=norm360(azomIn), holeAz=norm360(holeAzIn);
- const loc=localNormal(alpha,betaUse);
+
+ const betaRaw=norm360(betaIn), azom=norm360(azomIn), holeAz=norm360(holeAzIn);
  const b=vnorm([Math.cos(rad(holeInc))*Math.cos(rad(holeAz)),Math.cos(rad(holeInc))*Math.sin(rad(holeAz)),Math.sin(rad(holeInc))]);
  const h=[Math.cos(rad(azom)),Math.sin(rad(azom)),0];
  let xAxis=vnorm(add(h,mul(b,-dot(h,b)))); if(!xAxis){alert('OM Azimuth ขนานกับ hole axis มากเกินไป');return null}
  let yAxis=vnorm(cross(b,xAxis));
- let nw=vnorm(add(add(mul(xAxis,loc.n[0]),mul(yAxis,loc.n[1])),mul(b,loc.n[2])));
- const A=orientationFromNormal(nw);
- const B={dip:A.dip,dipDir:norm360(A.dipDir+180),strike:norm360(A.strike+180),strikeAlt:A.strike};
- last={alpha:round2(alpha),betaRaw:round2(betaIn),betaUse:round2(betaUse),azom:round2(azom),holeAz:round2(holeAz),holeInc:round2(holeInc),
- A:{dip:round2(A.dip),dipDir:round2(A.dipDir),strike:round2(A.strike),strikeAlt:round2(A.strikeAlt)},
- B:{dip:round2(B.dip),dipDir:round2(B.dipDir),strike:round2(B.strike),strikeAlt:round2(B.strikeAlt)}};
- betaUseEl.innerHTML=last.betaUse.toFixed(2)+'°';
+
+ function solvePlane(betaForPlane){
+   const loc=localNormal(alpha,betaForPlane);
+   const nw=vnorm(add(add(mul(xAxis,loc.n[0]),mul(yAxis,loc.n[1])),mul(b,loc.n[2])));
+   const o=orientationFromNormal(nw);
+   return {
+     dip:round2(o.dip),
+     dipDir:round2(o.dipDir),
+     strike:round2(o.strike),
+     strikeAlt:round2(o.strikeAlt),
+     betaUse:round2(loc.betaUse),
+     localDip:round2(loc.localDip),
+     localDir:round2(loc.localDir)
+   };
+ }
+
+ const A=solvePlane(betaRaw);
+ const B=solvePlane(betaRaw+180);
+
+ last={
+   alpha:round2(alpha),
+   betaRaw:round2(betaIn),
+   betaUseA:A.betaUse,
+   betaUseB:B.betaUse,
+   azom:round2(azom),
+   holeAz:round2(holeAz),
+   holeInc:round2(holeInc),
+   A:A,
+   B:B
+ };
+
+ betaUseEl.innerHTML='A '+last.betaUseA.toFixed(2)+'° / B '+last.betaUseB.toFixed(2)+'°';
  dipA.innerHTML=last.A.dip.toFixed(2)+'°';dirA.innerHTML=last.A.dipDir.toFixed(2)+'°';strikeA.innerHTML=last.A.strike.toFixed(2)+'°';
  dipB.innerHTML=last.B.dip.toFixed(2)+'°';dirB.innerHTML=last.B.dipDir.toFixed(2)+'°';strikeB.innerHTML=last.B.strike.toFixed(2)+'°';
  updateSelectedUI();
@@ -189,7 +250,7 @@ function updateSelectedUI(){
 }
 function addRecord(){
  const r=calc();if(!r)return;const s=r[selectedPlane];
- records.push({selected:selectedPlane,alpha:r.alpha,betaRaw:r.betaRaw,betaUse:r.betaUse,azom:r.azom,holeAz:r.holeAz,holeInc:r.holeInc,dip:s.dip,dipDir:s.dipDir,strike:s.strike,strikeAlt:s.strikeAlt});renderTable()
+ records.push({selected:selectedPlane,alpha:r.alpha,betaRaw:r.betaRaw,betaUse:s.betaUse,azom:r.azom,holeAz:r.holeAz,holeInc:r.holeInc,dip:s.dip,dipDir:s.dipDir,strike:s.strike,strikeAlt:s.strikeAlt});renderTable()
 }
 function renderTable(){
  const tbody=document.getElementById('tbody');tbody.innerHTML='';
